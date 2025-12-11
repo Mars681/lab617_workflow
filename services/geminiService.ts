@@ -1,7 +1,8 @@
 import { GoogleGenAI, FunctionDeclaration, Type, Tool, Part } from "@google/genai";
 import { GEMINI_SYSTEM_PROMPT, MCP_TOOLS } from '../constants';
 
-const API_KEY = process.env.API_KEY || ''; // In a real app, ensure this is set
+// Safely access process.env to avoid ReferenceError in purely browser environments
+const API_KEY = (typeof process !== 'undefined' && process.env && process.env.API_KEY) || '';
 
 let aiClient: GoogleGenAI | null = null;
 
