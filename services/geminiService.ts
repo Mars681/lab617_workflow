@@ -1,4 +1,4 @@
-import { GoogleGenAI, FunctionDeclaration, Type, Tool } from "@google/genai";
+import { GoogleGenAI, FunctionDeclaration, Type, Tool, Part } from "@google/genai";
 import { GEMINI_SYSTEM_PROMPT, MCP_TOOLS } from '../constants';
 
 const API_KEY = process.env.API_KEY || ''; // In a real app, ensure this is set
@@ -68,7 +68,7 @@ export const sendMessageToGemini = async (
     let finalResponseText = result.text || "";
 
     if (calls && calls.length > 0) {
-      const toolResponses = [];
+      const toolResponses: Part[] = [];
       
       for (const call of calls) {
         if (call.functionCall && call.functionCall.name === 'record_step') {
@@ -91,7 +91,7 @@ export const sendMessageToGemini = async (
 
       // Send tool results back to Gemini to get the final natural language response
       if (toolResponses.length > 0) {
-         const followup = await chat.sendMessage(toolResponses);
+         const followup = await chat.sendMessage({ message: toolResponses });
          finalResponseText = followup.text || "Updated the workflow.";
       }
     }

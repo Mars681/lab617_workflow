@@ -131,8 +131,14 @@ const resources = {
   }
 };
 
-i18next
-  .use(initReactI18next)
+// Handle ESM default export inconsistencies (common in non-bundled environments like esm.sh)
+// @ts-ignore
+const i18n = i18next.default || i18next;
+// @ts-ignore
+const initReact = initReactI18next.default || initReactI18next;
+
+i18n
+  .use(initReact)
   .init({
     resources,
     lng: "en", // default language
@@ -142,4 +148,4 @@ i18next
     }
   });
 
-export default i18next;
+export default i18n;
