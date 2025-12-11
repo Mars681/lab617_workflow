@@ -1,0 +1,5 @@
+{
+  "name": "MCP Workflow Orchestrator",
+  "description": "A React-based visual workflow builder for MCP tools, featuring drag-and-drop orchestration, mock execution, and a Gemini-powered AI assistant for natural language workflow modification.",
+  "requestFramePermissions": []
+}
