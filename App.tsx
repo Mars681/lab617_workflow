@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { 
   Play, 
   Settings, 
@@ -12,7 +12,10 @@ import {
   HelpCircle,
   X,
   Zap,
-  Globe
+  Globe,
+  Code,
+  Eye,
+  Edit2
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +24,7 @@ import { MCP_TOOLS, DEFAULT_INPUT_JSON } from './constants';
 import { WorkflowStep, ExecutionLog, MCPTool } from './types';
 import WorkflowNode from './components/WorkflowNode';
 import ChatAssistant from './components/ChatAssistant';
+import DataVisualizer from './components/DataVisualizer';
 
 const App: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -28,11 +32,21 @@ const App: React.FC = () => {
   // State
   const [workflowName, setWorkflowName] = useState('Example Workflow');
   const [globalInput, setGlobalInput] = useState(DEFAULT_INPUT_JSON);
+  const [isEditingInput, setIsEditingInput] = useState(false); // New state for input mode
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
   const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(true);
+
+  // Parse global input for visualization
+  const parsedGlobalInput = useMemo(() => {
+    try {
+      return JSON.parse(globalInput);
+    } catch (e) {
+      return null;
+    }
+  }, [globalInput]);
 
   // Initialize with a demo workflow to show the user how it works immediately
   useEffect(() => {
@@ -145,13 +159,13 @@ const App: React.FC = () => {
 
       // Mock Logic based on tool ID
       if (tool.id === 'matrix.add') {
-        logEntry.response = { result: [[2, 4], [6, 8]], message: "Matrices added" };
+        logEntry.response = { result: [[2, 4], [6, 8]], message: "Matrices added successfully" };
       } else if (tool.id === 'data.normalize') {
-        logEntry.response = { result: [0, 0.25, 0.5, 0.75, 1.0], message: "Data normalized" };
+        logEntry.response = { result: [0, 0.25, 0.5, 0.75, 1.0], message: "Data normalized using MinMax" };
       } else if (tool.id === 'poly.fit') {
-        logEntry.response = { coefficients: [1.2, 0.5, 0.01], degree: 2 };
+        logEntry.response = { coefficients: [1.2, 0.5, 0.01], degree: 2, r_squared: 0.98 };
       } else if (tool.id === 'utils.log') {
-        logEntry.response = { logged: true, timestamp: new Date().toISOString() };
+        logEntry.response = { logged: true, timestamp: new Date().toLocaleTimeString() };
       } else {
         logEntry.response = { output: "Mock data generated", status: "OK" };
       }
@@ -192,17 +206,37 @@ const App: React.FC = () => {
           </div>
 
           {/* JSON Input */}
-          <div className="space-y-3 flex-1 flex flex-col">
+          <div className="space-y-3 flex-1 flex flex-col min-h-0">
             <div className="flex justify-between items-center">
               <label className="text-xs font-semibold uppercase text-slate-400 tracking-wider">{t('config.globalInput')}</label>
-              <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500">{t('config.readOnly')}</span>
+              <button 
+                onClick={() => setIsEditingInput(!isEditingInput)}
+                className="text-[10px] bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors flex items-center gap-1"
+              >
+                {isEditingInput ? <><Eye size={10} /> {t('config.view')}</> : <><Code size={10} /> {t('config.edit')}</>}
+              </button>
             </div>
-            <textarea 
-              value={globalInput}
-              onChange={(e) => setGlobalInput(e.target.value)}
-              className="w-full h-64 px-3 py-2 bg-slate-900 text-slate-300 font-mono text-xs rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none border border-slate-800"
-              spellCheck={false}
-            />
+            
+            <div className="flex-1 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg">
+              {isEditingInput ? (
+                <textarea 
+                  value={globalInput}
+                  onChange={(e) => setGlobalInput(e.target.value)}
+                  className="w-full h-full p-3 bg-slate-900 text-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+                  spellCheck={false}
+                />
+              ) : (
+                <div className="p-3">
+                  {parsedGlobalInput ? (
+                    <DataVisualizer data={parsedGlobalInput} rootMode={true} />
+                  ) : (
+                    <div className="text-red-500 text-xs p-2 bg-red-50 rounded border border-red-100">
+                      Invalid JSON syntax. Switch to edit mode to fix.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -370,19 +404,23 @@ const App: React.FC = () => {
                 </div>
               ) : (
                 executionLogs.map((log, idx) => (
-                  <div key={idx} className="bg-white rounded border border-slate-200 p-3 shadow-sm animate-in slide-in-from-right-2 duration-300">
+                  <div key={idx} className="bg-white rounded-lg border border-slate-200 p-3 shadow-sm animate-in slide-in-from-right-2 duration-300">
                     <div className="flex justify-between items-center mb-2 border-b border-slate-50 pb-2">
-                      <span className="font-bold text-slate-700">{log.stepIndex}. {log.stepName}</span>
-                      <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{t('logs.empty.title')}</span>
+                      <span className="font-bold text-slate-700 flex items-center gap-2">
+                        <span className="bg-indigo-100 text-indigo-600 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">{log.stepIndex}</span>
+                        {log.stepName}
+                      </span>
+                      <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Success</span>
                     </div>
-                    <div className="space-y-2">
+                    
+                    <div className="space-y-3">
+                      {/* We don't really need to show Context Keys for beginners, it's confusing. 
+                          We can focus on the Output. */}
                       <div>
-                        <span className="text-slate-400 block mb-0.5 uppercase tracking-wider text-[9px]">{t('logs.input')}</span>
-                        <pre className="text-slate-600 overflow-x-auto">{JSON.stringify(log.request, null, 1).replace(/{|}/g, '')}</pre>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block mb-0.5 uppercase tracking-wider text-[9px]">{t('logs.output')}</span>
-                        <pre className="text-slate-800 bg-slate-50 p-1.5 rounded overflow-x-auto">{JSON.stringify(log.response, null, 2)}</pre>
+                        <span className="text-slate-400 block mb-1 uppercase tracking-wider text-[9px] font-bold">{t('logs.output')}</span>
+                        <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                           <DataVisualizer data={log.response} />
+                        </div>
                       </div>
                     </div>
                   </div>
