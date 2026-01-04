@@ -322,11 +322,28 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
     const logs: ExecutionLog[] = [];
     let sharedContext: Record<string, any> = { global_input: baseInput };
 
-    // map edges to simple connection list
-    const connectionList = edges.map((e) => ({ fromNodeId: e.source, toNodeId: e.target }));
+    // map edges to adjacency + indegree for topo order
+    const indegree: Record<string, number> = {};
+    const outgoingMap: Record<string, string[]> = {};
+    nodes.forEach((n) => {
+      indegree[n.id] = 0;
+      outgoingMap[n.id] = [];
+    });
+    edges.forEach((e) => {
+      indegree[e.target] = (indegree[e.target] ?? 0) + 1;
+      if (!outgoingMap[e.source]) outgoingMap[e.source] = [];
+      outgoingMap[e.source].push(e.target);
+    });
 
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
+    const queue: string[] = nodes.filter((n) => indegree[n.id] === 0).map((n) => n.id);
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+      const nodeId = queue.shift()!;
+      const node = nodes.find((n) => n.id === nodeId);
+      if (!node) continue;
+      visited.add(nodeId);
+
       const tool = availableTools.find((t) => t.id === node.data.toolId);
       if (!tool) continue;
 
@@ -336,7 +353,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         __prev_output: inputsForNode.length ? inputsForNode[inputsForNode.length - 1] : null,
         __all_inputs: inputsForNode,
         __inputs_by_node: incomingBySource[node.id] || {},
-        step_index: i + 1,
+        step_index: logs.length + 1,
       };
       const requestKeys = Object.keys(context);
 
@@ -349,7 +366,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         const responseForLog = res?.output ?? res;
 
         const logEntry: ExecutionLog = {
-          stepIndex: i + 1,
+          stepIndex: logs.length + 1,
           stepName: tool?.name || node.data.toolName,
           toolId: tool?.id || node.data.toolId,
           request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId },
@@ -362,21 +379,26 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         setExecutionLogs([...logs]);
 
         // Fan-out: push this output to all downstream nodes connected from this node
-        const outgoing = connectionList.filter((c) => c.fromNodeId === node.id);
-        outgoing.forEach((conn) => {
-          const arr = incomingPayloads[conn.toNodeId] || [];
+        const outgoing = outgoingMap[node.id] || [];
+        outgoing.forEach((toId) => {
+          const arr = incomingPayloads[toId] || [];
           arr.push(payload);
-          incomingPayloads[conn.toNodeId] = arr;
+          incomingPayloads[toId] = arr;
 
-          const bySource = incomingBySource[conn.toNodeId] || {};
+          const bySource = incomingBySource[toId] || {};
           const fromList = bySource[node.id] || [];
           fromList.push(payload);
           bySource[node.id] = fromList;
-          incomingBySource[conn.toNodeId] = bySource;
+          incomingBySource[toId] = bySource;
+
+          indegree[toId] -= 1;
+          if (indegree[toId] === 0) {
+            queue.push(toId);
+          }
         });
       } catch (error: any) {
         const logEntry: ExecutionLog = {
-          stepIndex: i + 1,
+          stepIndex: logs.length + 1,
           stepName: tool?.name || node.data.toolName,
           toolId: tool?.id || node.data.toolId,
           request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId },
@@ -387,6 +409,11 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         logs.push(logEntry);
         setExecutionLogs([...logs]);
       }
+    }
+
+    // cycle detection: nodes not visited means there is a loop or missing inputs
+    if (visited.size !== nodes.length) {
+      alert('存在循环依赖或断开的节点，部分步骤未执行完全。请检查连线。');
     }
 
     setIsExecuting(false);
