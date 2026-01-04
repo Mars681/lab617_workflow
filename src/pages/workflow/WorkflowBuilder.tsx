@@ -316,60 +316,79 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       return;
     }
 
-    // Inputs collected per node from upstream connections
-    const incomingPayloads: Record<string, any[]> = {};
-    const incomingBySource: Record<string, Record<string, any[]>> = {};
-    const logs: ExecutionLog[] = [];
-    let sharedContext: Record<string, any> = { global_input: baseInput };
-
-    // map edges to adjacency + indegree for topo order
-    const indegree: Record<string, number> = {};
+    // Build incoming / outgoing maps for branching
+    const incomingMap: Record<string, string[]> = {};
     const outgoingMap: Record<string, string[]> = {};
-    nodes.forEach((n) => {
-      indegree[n.id] = 0;
-      outgoingMap[n.id] = [];
-    });
     edges.forEach((e) => {
-      indegree[e.target] = (indegree[e.target] ?? 0) + 1;
+      if (!incomingMap[e.target]) incomingMap[e.target] = [];
+      incomingMap[e.target].push(e.source);
       if (!outgoingMap[e.source]) outgoingMap[e.source] = [];
       outgoingMap[e.source].push(e.target);
     });
 
-    const queue: string[] = nodes.filter((n) => indegree[n.id] === 0).map((n) => n.id);
-    const visited = new Set<string>();
+    const roots = nodes.filter((n) => !incomingMap[n.id] || incomingMap[n.id].length === 0);
+    if (roots.length === 0) {
+      alert('No entry nodes found. Please add at least one node with no incoming edges.');
+      setIsExecuting(false);
+      return;
+    }
+
+    type ExecutionTask = {
+      nodeId: string;
+      depth: number;
+      pathId: string;
+      context: Record<string, any>;
+      prevOutput: any;
+    };
+
+    const initialContext = { global_input: baseInput };
+    const queue: ExecutionTask[] = roots.map((node, idx) => ({
+      nodeId: node.id,
+      depth: 1,
+      pathId: `path-${idx + 1}`,
+      context: initialContext,
+      prevOutput: null,
+    }));
+
+    const logs: ExecutionLog[] = [];
+    let processed = 0;
+    const maxRuns = nodes.length * Math.max(2, edges.length + 1) * 4;
 
     while (queue.length > 0) {
-      const nodeId = queue.shift()!;
-      const node = nodes.find((n) => n.id === nodeId);
+      if (processed > maxRuns) {
+        alert('Detected a possible cycle or runaway branching; execution was stopped.');
+        break;
+      }
+      processed += 1;
+
+      const task = queue.shift()!;
+      const node = nodes.find((n) => n.id === task.nodeId);
       if (!node) continue;
-      visited.add(nodeId);
 
       const tool = availableTools.find((t) => t.id === node.data.toolId);
       if (!tool) continue;
 
-      const inputsForNode = incomingPayloads[node.id] || [];
-      const context: any = {
-        ...sharedContext,
-        __prev_output: inputsForNode.length ? inputsForNode[inputsForNode.length - 1] : null,
-        __all_inputs: inputsForNode,
-        __inputs_by_node: incomingBySource[node.id] || {},
-        step_index: logs.length + 1,
+      const contextForTool: any = {
+        ...task.context,
+        __prev_output: task.prevOutput,
+        __all_inputs: task.prevOutput === null ? [] : [task.prevOutput],
+        __inputs_by_node: task.prevOutput === null ? {} : { [node.id]: [task.prevOutput] },
+        step_index: task.depth,
+        path_id: task.pathId,
       };
-      const requestKeys = Object.keys(context);
+      const requestKeys = Object.keys(contextForTool);
 
       try {
-        const res: any = await executeTool(tool.id, context);
+        const res: any = await executeTool(tool.id, contextForTool);
         const payload = res?.context ?? res?.output ?? res;
-        if (res?.context) {
-          sharedContext = res.context;
-        }
+        const nextContext = res?.context ?? task.context;
         const responseForLog = res?.output ?? res;
 
         const logEntry: ExecutionLog = {
-          stepIndex: logs.length + 1,
+          stepIndex: task.depth,
           stepName: tool?.name || node.data.toolName,
           toolId: tool?.id || node.data.toolId,
-          request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId },
+          request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId, path_id: task.pathId },
           response: responseForLog,
           status: 'success',
           timestamp: Date.now(),
@@ -378,30 +397,25 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         logs.push(logEntry);
         setExecutionLogs([...logs]);
 
-        // Fan-out: push this output to all downstream nodes connected from this node
         const outgoing = outgoingMap[node.id] || [];
-        outgoing.forEach((toId) => {
-          const arr = incomingPayloads[toId] || [];
-          arr.push(payload);
-          incomingPayloads[toId] = arr;
+        if (outgoing.length === 0) continue;
 
-          const bySource = incomingBySource[toId] || {};
-          const fromList = bySource[node.id] || [];
-          fromList.push(payload);
-          bySource[node.id] = fromList;
-          incomingBySource[toId] = bySource;
-
-          indegree[toId] -= 1;
-          if (indegree[toId] === 0) {
-            queue.push(toId);
-          }
+        outgoing.forEach((toId, idx) => {
+          const nextPathId = outgoing.length > 1 ? `${task.pathId}.${idx + 1}` : task.pathId;
+          queue.push({
+            nodeId: toId,
+            depth: task.depth + 1,
+            pathId: nextPathId,
+            context: nextContext,
+            prevOutput: payload,
+          });
         });
       } catch (error: any) {
         const logEntry: ExecutionLog = {
-          stepIndex: logs.length + 1,
+          stepIndex: task.depth,
           stepName: tool?.name || node.data.toolName,
           toolId: tool?.id || node.data.toolId,
-          request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId },
+          request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId, path_id: task.pathId },
           response: { error: error?.message || 'Execution Failed' },
           status: 'error',
           timestamp: Date.now(),
@@ -411,14 +425,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       }
     }
 
-    // cycle detection: nodes not visited means there is a loop or missing inputs
-    if (visited.size !== nodes.length) {
-      alert('存在循环依赖或断开的节点，部分步骤未执行完全。请检查连线。');
-    }
-
     setIsExecuting(false);
   };
-
   return (
     <div className="flex flex-col h-full overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
       {/* Toolbar */}
