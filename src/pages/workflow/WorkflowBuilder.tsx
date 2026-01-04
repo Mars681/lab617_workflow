@@ -578,7 +578,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
 
         {/* Canvas */}
         <div className="flex-1 bg-slate-50/50 dark:bg-slate-900 p-8 overflow-y-auto flex flex-col relative transition-colors">
-          <div className="max-w-2xl mx-auto w-full">
+          <div className="max-w-6xl mx-auto w-full">
             <div className="flex justify-between items-end mb-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{t('canvas.title')}</h2>
@@ -594,7 +594,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
               )}
             </div>
 
-            <div className="h-[640px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-inner overflow-hidden">
+            <div className="h-[700px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-inner overflow-hidden">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
