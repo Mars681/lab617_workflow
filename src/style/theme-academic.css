@@ -1,0 +1,262 @@
+/* =========================================================
+   Academic Paper Theme
+   Serif · Formal · LaTeX-like
+   ========================================================= */
+
+.theme-academic {
+  font-family: "Times New Roman", Times, "Nimbus Roman", serif;
+  font-size: 12pt;
+  color: #000;
+  background-color: #fff;
+
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 4rem 5rem;
+
+  line-height: 2;
+  word-break: normal;
+  hyphens: auto;
+
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* =====================
+   Dark Mode
+   ===================== */
+
+.dark .theme-academic {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+}
+
+/* =========================================================
+   Headings
+   ========================================================= */
+
+/* Title */
+.theme-academic h1 {
+  font-size: 24pt;
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+
+  margin-top: 2.5em;
+  margin-bottom: 2em;
+
+  letter-spacing: 0.05em;
+}
+
+.dark .theme-academic h1 {
+  color: #ffffff;
+}
+
+/* Section */
+.theme-academic h2 {
+  font-size: 16pt;
+  font-weight: bold;
+  text-transform: uppercase;
+
+  margin-top: 2.5em;
+  margin-bottom: 1em;
+
+  border-bottom: 1px solid #000;
+  padding-bottom: 0.2em;
+}
+
+.dark .theme-academic h2 {
+  border-color: #555;
+  color: #eeeeee;
+}
+
+/* Subsection */
+.theme-academic h3 {
+  font-size: 14pt;
+  font-weight: bold;
+  font-style: italic;
+
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+}
+
+/* =========================================================
+   Paragraphs
+   ========================================================= */
+
+.theme-academic p {
+  text-align: justify;
+  text-indent: 2em;
+  margin: 0 0 1em 0;
+}
+
+/* First paragraph after headings: no indent (academic norm) */
+.theme-academic h1 + p,
+.theme-academic h2 + p,
+.theme-academic h3 + p {
+  text-indent: 0;
+}
+
+/* =========================================================
+   Inline & Display Math
+   ========================================================= */
+
+/* Prevent text-indent issues with inline math */
+.theme-academic p .katex,
+.theme-academic p .math-jax-wrapper,
+.theme-academic p .math-jax-wrapper.inline-block {
+  text-indent: 0;
+  vertical-align: middle;
+}
+
+/* Slightly increase math size to match text */
+.theme-academic .katex {
+  font-size: 1.05em;
+}
+
+/* Display equations spacing */
+.theme-academic .math-display,
+.theme-academic .katex-display {
+  margin: 1.5em 0;
+  text-align: center;
+}
+
+/* =========================================================
+   Blockquotes (Long Quotations)
+   ========================================================= */
+
+.theme-academic blockquote {
+  margin: 2em 4em;
+  padding: 0;
+  border: none;
+
+  font-style: italic;
+  font-size: 0.95em;
+}
+
+.theme-academic blockquote p {
+  text-indent: 0;
+}
+
+/* =========================================================
+   Lists
+   ========================================================= */
+
+.theme-academic ul,
+.theme-academic ol {
+  margin: 1em 0 1em 3em;
+}
+
+.theme-academic li {
+  margin-bottom: 0.5em;
+}
+
+/* =========================================================
+   Tables
+   ========================================================= */
+
+.theme-academic table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2em 0;
+  font-size: 11pt;
+}
+
+.theme-academic th,
+.theme-academic td {
+  border: 1px solid #000;
+  padding: 0.5em 0.75em;
+  text-align: center;
+}
+
+.dark .theme-academic th,
+.dark .theme-academic td {
+  border-color: #555;
+}
+
+/* Table caption (LaTeX-like) */
+.theme-academic caption {
+  caption-side: bottom;
+  text-align: center;
+  font-size: 10.5pt;
+  margin-top: 0.75em;
+}
+
+/* =========================================================
+   Figures & Captions
+   ========================================================= */
+
+.theme-academic figure {
+  margin: 2em auto;
+  text-align: center;
+}
+
+.theme-academic figcaption {
+  font-size: 10.5pt;
+  margin-top: 0.75em;
+}
+
+/* =========================================================
+   Code (Formal, Minimal)
+   ========================================================= */
+
+.theme-academic pre,
+.theme-academic code {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.9em;
+}
+
+.theme-academic pre {
+  border: 1px solid #000;
+  padding: 1em;
+  margin: 2em 0;
+  background: transparent;
+  overflow-x: auto;
+}
+
+.dark .theme-academic pre {
+  border-color: #555;
+}
+
+/* Inline code */
+.theme-academic p code {
+  padding: 0 0.2em;
+}
+
+/* =========================================================
+   Footnotes / References
+   ========================================================= */
+
+.theme-academic sup {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+
+/* Reference list */
+.theme-academic .references,
+.theme-academic .bibliography {
+  margin-top: 3em;
+  font-size: 11pt;
+}
+
+.theme-academic .references p,
+.theme-academic .bibliography p {
+  text-indent: -2em;
+  margin-left: 2em;
+}
+
+/* =========================================================
+   Page-like Finishing Touches
+   ========================================================= */
+
+/* Prevent widows & orphans (best effort) */
+.theme-academic p {
+  orphans: 2;
+  widows: 2;
+}
+
+/* Print-friendly */
+@media print {
+  .theme-academic {
+    box-shadow: none;
+    padding: 2.5cm;
+  }
+}

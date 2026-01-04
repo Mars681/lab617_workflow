@@ -1,0 +1,171 @@
+/* Theme: Lab Report (Modern, Clean, Structured) */
+
+.theme-lab {
+  font-family: 'Inter', sans-serif;
+  color: #334155;
+  background-color: #ffffff;
+  padding: 4rem;
+  max-width: 850px;
+  margin: 0 auto;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  min-height: 100%;
+}
+
+.dark .theme-lab {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+/* Headings */
+.theme-lab h1 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  border-bottom: 3px solid #3b82f6; /* Blue underline */
+  padding-bottom: 0.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.dark .theme-lab h1 { color: #f8fafc; }
+
+.theme-lab h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  padding-left: 0.75rem;
+  border-left: 4px solid #3b82f6;
+}
+
+.dark .theme-lab h2 { color: #f1f5f9; }
+
+.theme-lab h3 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #334155;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.dark .theme-lab h3 { color: #e2e8f0; }
+
+/* Paragraphs */
+.theme-lab p {
+  margin-bottom: 1.25rem;
+  text-align: left;
+  line-height: 1.8;
+}
+
+/* Lists */
+.theme-lab ul, .theme-lab ol {
+  padding-left: 2rem;
+  margin-bottom: 1.25rem;
+}
+
+.theme-lab li {
+  margin-bottom: 0.5rem;
+}
+
+/* Code */
+.theme-lab pre {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 1.5rem;
+}
+
+.dark .theme-lab pre {
+  background: #0f172a;
+  border-color: #334155;
+}
+/* Tables */
+.theme-lab table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2rem 0;
+  font-size: 0.95rem;
+}
+
+.theme-lab thead {
+  background-color: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.theme-lab th,
+.theme-lab td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  vertical-align: top;
+  border: 1px solid #e2e8f0;
+}
+
+.theme-lab th {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.theme-lab tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+/* Dark mode */
+.dark .theme-lab thead {
+  background-color: #020617;
+  border-bottom-color: #334155;
+}
+
+.dark .theme-lab th,
+.dark .theme-lab td {
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark .theme-lab tbody tr:nth-child(even) {
+  background-color: #020617;
+}
+
+/* Lists – improved readability */
+.theme-lab ul,
+.theme-lab ol {
+  padding-left: 2rem;
+  margin: 1.25rem 0;
+}
+
+.theme-lab ul {
+  list-style-type: disc;
+}
+
+.theme-lab ol {
+  list-style-type: decimal;
+}
+
+.theme-lab li {
+  margin-bottom: 0.6rem;
+  line-height: 1.7;
+}
+
+/* Nested lists */
+.theme-lab li ul,
+.theme-lab li ol {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* h4 – Sub-subsection / Method-level heading */
+.theme-lab h4 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #475569;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+/* Dark mode */
+.dark .theme-lab h4 {
+  color: #cbd5f5;
+}
+
+

@@ -1,0 +1,45 @@
+/* Chat Specific Styles - Improved Spacing & Readability */
+
+.chat-content {
+  font-size: 15px; /* Slightly larger for readability */
+  line-height: 1.75; /* More spacious leading */
+}
+
+/* Override Tailwind Prose for Chat to be less dense */
+.chat-content .prose p {
+  margin-bottom: 1.25em; 
+  margin-top: 0;
+}
+
+.chat-content .prose h1,
+.chat-content .prose h2,
+.chat-content .prose h3 {
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  color: inherit; /* Inherit color from bubble context */
+}
+
+.chat-content .prose ul,
+.chat-content .prose ol {
+  margin-top: 0.5em;
+  margin-bottom: 1em;
+}
+
+.chat-content .prose li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+/* Ensure code blocks in chat don't look cramped */
+.chat-content .prose pre {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  line-height: 1.5;
+}
+
+/* Math blocks in chat */
+.chat-content .katex-display {
+  margin: 1.5em 0;
+  overflow-x: auto;
+  padding: 0.5em 0;
+}
