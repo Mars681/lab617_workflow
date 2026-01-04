@@ -10,6 +10,19 @@ export interface WorkflowStep {
   toolId: string;
 }
 
+// Graph-based workflow node (can replace WorkflowStep; kept separate for clarity)
+export interface WorkflowNode {
+  id: string;
+  toolId: string;
+}
+
+// Simple directed connection: from one node to another (one output -> many targets supported)
+export interface Connection {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+}
+
 export interface ExecutionLog {
   stepIndex: number;
   stepName: string;

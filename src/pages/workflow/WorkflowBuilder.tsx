@@ -1,4 +1,18 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import ReactFlow, {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  Background,
+  Controls,
+  MiniMap,
+  Connection as FlowConnection,
+  Edge,
+  Node,
+  EdgeChange,
+  NodeChange,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import {
   Play,
   Box,
@@ -7,7 +21,6 @@ import {
   ChevronRight,
   Terminal,
   Activity,
-  ArrowDown,
   HelpCircle,
   Zap,
   Code,
@@ -18,8 +31,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 
 import { DEFAULT_INPUT_JSON } from '../../constants';
-import { WorkflowStep, ExecutionLog, MCPTool } from '../../types';
-import WorkflowNode from './components/WorkflowNode';
+import { ExecutionLog, MCPTool } from '../../types';
+import WorkflowNode, { FlowNodeData } from './components/WorkflowNode';
 import ChatAssistant from './components/ChatAssistant';
 import DataVisualizer from '../components/DataVisualizer';
 import { executeTool, getAvailableTools, getToolCategories } from '../../api/workflow';
@@ -39,10 +52,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
   const [workflowName, setWorkflowName] = useState('Example Workflow');
   const [globalInput, setGlobalInput] = useState(DEFAULT_INPUT_JSON);
   const [isEditingInput, setIsEditingInput] = useState(false);
-  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
+  const [nodes, setNodes] = useState<Node<FlowNodeData>[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
   const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
   // MAT upload state
@@ -86,8 +99,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       setAvailableTools(tools);
       setCategories(cats);
 
-      // if (workflowSteps.length === 0 && tools.length > 0) {
-      //   setWorkflowSteps([
+      // if (nodes.length === 0 && tools.length > 0) {
+      //   setNodes([
       //     // { id: uuidv4(), toolId: 'matrix.add' },
       //     // { id: uuidv4(), toolId: 'data.normalize' },
       //     // { id: uuidv4(), toolId: 'utils.log' }
@@ -100,10 +113,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
   // Sync state to debug service
   useEffect(() => {
     if (isDevMode()) {
-      const toolDescriptions = workflowSteps.map((step) => {
-        const tool = availableTools.find((t) => t.id === step.toolId);
+      const toolDescriptions = nodes.map((step) => {
+        const tool = availableTools.find((t) => t.id === step.data.toolId);
         if (!tool) {
-          return { toolId: step.toolId, name: step.toolId, description: 'Unknown tool' };
+          return { toolId: step.data.toolId, name: step.data.toolId, description: 'Unknown tool' };
         }
 
         const localizedName =
@@ -121,12 +134,18 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         return { toolId: tool.id, name: localizedName, description: localizedDescription };
       });
 
+      const safeNodes = nodes.map((n) => ({
+        ...n,
+        data: { ...n.data, onDelete: undefined },
+      }));
+
       debugService.registerState(
         'workflow.current',
         {
           workflowName,
-          stepCount: workflowSteps.length,
-          steps: workflowSteps,
+          stepCount: nodes.length,
+          steps: safeNodes,
+          connections: edges,
           toolDescriptions,
           globalInput: globalInput,
           executionLogs: executionLogs,
@@ -135,7 +154,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         { title: 'Current Workflow State', category: 'Workflow' }
       );
     }
-  }, [workflowName, workflowSteps, availableTools, globalInput, executionLogs, i18n.language]);
+  }, [workflowName, nodes, edges, availableTools, globalInput, executionLogs, i18n.language]);
 
   // ✅ Logs resize handlers
   const startResizeLogs = useCallback((e: React.MouseEvent) => {
@@ -212,60 +231,78 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
     }
   };
 
-  const handleAddStep = (toolId: string) => {
-    const exists = availableTools.some((t) => t.id === toolId);
-    if (!exists) {
-      alert(`工具未注册到后端工具池：${toolId}\n请检查 getAvailableTools() 是否返回该工具。`);
-      return;
-    }
-    setWorkflowSteps((prev) => [...prev, { id: uuidv4(), toolId }]);
+  const handleDeleteStep = (id: string) => {
+    setNodes((prev) => prev.filter((s) => s.id !== id));
+    setEdges((prev) => prev.filter((e) => e.source !== id && e.target !== id));
   };
 
+  const handleAddStep = useCallback(
+    (toolId: string) => {
+      const exists = availableTools.some((t) => t.id === toolId);
+      if (!exists) {
+        alert(`工具未注册到后端工具池：${toolId}\n请检查 getAvailableTools() 是否返回该工具。`);
+        return;
+      }
+      const tool = availableTools.find((t) => t.id === toolId);
+      setNodes((prev) => {
+        const idx = prev.length;
+        const newNode: Node<FlowNodeData> = {
+          id: uuidv4(),
+          type: 'tool',
+          position: { x: 160 + (idx % 3) * 220, y: 80 + Math.floor(idx / 3) * 160 },
+          data: {
+            toolId,
+            toolName: tool?.name || toolId,
+            toolDescription: tool?.description || toolId,
+            category: (tool?.category as MCPTool['category']) || 'utility',
+            onDelete: handleDeleteStep,
+          },
+        };
+        return [...prev, newNode];
+      });
+    },
+    [availableTools, handleDeleteStep]
+  );
+
   const handleResetWorkflow = () => {
-    setWorkflowSteps([]);
+    setNodes([]);
+    setEdges([]);
     setExecutionLogs([]);
   };
 
-  const handleDeleteStep = (id: string) => {
-    setWorkflowSteps((prev) => prev.filter((s) => s.id !== id));
-  };
-
   // Chat Assistant callback
-  const handleAssistantToolAction = useCallback((toolId: string, reset: boolean) => {
-    setWorkflowSteps((prev) => {
-      const next = reset ? [{ id: uuidv4(), toolId }] : [...prev, { id: uuidv4(), toolId }];
-      console.log('[WF add]', { toolId, reset, prevLen: prev.length, nextLen: next.length, next });
-      return next;
-    });
-  }, []);
+  const handleAssistantToolAction = useCallback(
+    (toolId: string, reset: boolean) => {
+      if (reset) {
+        setEdges([]);
+        setNodes([]);
+      }
+      handleAddStep(toolId);
+    },
+    [handleAddStep]
+  );
 
-  // Drag and Drop Logic
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-    setDraggedItemIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-  };
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    []
+  );
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    []
+  );
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-    e.preventDefault();
-    if (draggedItemIndex === null || draggedItemIndex === index) return;
+  const onConnect = useCallback(
+    (connection: FlowConnection) =>
+      setEdges((eds) => addEdge({ ...connection, type: 'smoothstep', animated: true }, eds)),
+    []
+  );
 
-    const newSteps = [...workflowSteps];
-    const draggedItem = newSteps[draggedItemIndex];
-    newSteps.splice(draggedItemIndex, 1);
-    newSteps.splice(index, 0, draggedItem);
-
-    setWorkflowSteps(newSteps);
-    setDraggedItemIndex(null);
-  };
+  const nodeTypes = useMemo(() => ({ tool: WorkflowNode }), []);
 
   // Execution Engine
   const executeWorkflow = async () => {
-    if (workflowSteps.length === 0) return;
+    if (nodes.length === 0) return;
 
     setIsExecuting(true);
     setExecutionLogs([]);
@@ -279,36 +316,43 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       return;
     }
 
-    let currentContext: any = {
-      global_input: baseInput,
-      __prev_output: null,
-      step_index: 0,
-    };
-
+    // Inputs collected per node from upstream connections
+    const incomingPayloads: Record<string, any[]> = {};
+    const incomingBySource: Record<string, Record<string, any[]>> = {};
     const logs: ExecutionLog[] = [];
+    let sharedContext: Record<string, any> = { global_input: baseInput };
 
-    for (let i = 0; i < workflowSteps.length; i++) {
-      const step = workflowSteps[i];
-      const tool = availableTools.find((t) => t.id === step.toolId);
+    // map edges to simple connection list
+    const connectionList = edges.map((e) => ({ fromNodeId: e.source, toNodeId: e.target }));
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      const tool = availableTools.find((t) => t.id === node.data.toolId);
       if (!tool) continue;
 
-      currentContext.step_index = i + 1;
-      const requestKeys = Object.keys(currentContext);
+      const inputsForNode = incomingPayloads[node.id] || [];
+      const context: any = {
+        ...sharedContext,
+        __prev_output: inputsForNode.length ? inputsForNode[inputsForNode.length - 1] : null,
+        __all_inputs: inputsForNode,
+        __inputs_by_node: incomingBySource[node.id] || {},
+        step_index: i + 1,
+      };
+      const requestKeys = Object.keys(context);
 
       try {
-        const res: any = await executeTool(tool.id, currentContext);
-
+        const res: any = await executeTool(tool.id, context);
+        const payload = res?.context ?? res?.output ?? res;
         if (res?.context) {
-          currentContext = res.context;
+          sharedContext = res.context;
         }
-
         const responseForLog = res?.output ?? res;
 
         const logEntry: ExecutionLog = {
           stepIndex: i + 1,
-          stepName: tool.name,
-          toolId: tool.id,
-          request: { context_keys: requestKeys, tool: tool.id },
+          stepName: tool?.name || node.data.toolName,
+          toolId: tool?.id || node.data.toolId,
+          request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId },
           response: responseForLog,
           status: 'success',
           timestamp: Date.now(),
@@ -316,13 +360,27 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
 
         logs.push(logEntry);
         setExecutionLogs([...logs]);
+
+        // Fan-out: push this output to all downstream nodes connected from this node
+        const outgoing = connectionList.filter((c) => c.fromNodeId === node.id);
+        outgoing.forEach((conn) => {
+          const arr = incomingPayloads[conn.toNodeId] || [];
+          arr.push(payload);
+          incomingPayloads[conn.toNodeId] = arr;
+
+          const bySource = incomingBySource[conn.toNodeId] || {};
+          const fromList = bySource[node.id] || [];
+          fromList.push(payload);
+          bySource[node.id] = fromList;
+          incomingBySource[conn.toNodeId] = bySource;
+        });
       } catch (error: any) {
         const logEntry: ExecutionLog = {
           stepIndex: i + 1,
-          stepName: tool.name,
-          toolId: tool.id,
-          request: { context_keys: requestKeys, tool: tool.id },
-          response: { error: error.message || 'Execution Failed' },
+          stepName: tool?.name || node.data.toolName,
+          toolId: tool?.id || node.data.toolId,
+          request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId },
+          response: { error: error?.message || 'Execution Failed' },
           status: 'error',
           timestamp: Date.now(),
         };
@@ -405,6 +463,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                 )}
               </div>
             </div>
+
 
             {/* MAT/CSV Upload */}
             <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-700">
@@ -495,9 +554,9 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
           <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
             <button
               onClick={executeWorkflow}
-              disabled={isExecuting || workflowSteps.length === 0}
+              disabled={isExecuting || nodes.length === 0}
               className={`relative w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold shadow-lg shadow-indigo-500/20 transition-all active:scale-95 text-sm ${
-                isExecuting || workflowSteps.length === 0
+                isExecuting || nodes.length === 0
                   ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed shadow-none'
                   : 'bg-indigo-600 text-white hover:bg-indigo-700'
               }`}
@@ -525,7 +584,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                 <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{t('canvas.title')}</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">{t('canvas.subtitle')}</p>
               </div>
-              {workflowSteps.length > 0 && (
+              {nodes.length > 0 && (
                 <button
                   onClick={handleResetWorkflow}
                   className="text-xs font-medium text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
@@ -535,34 +594,29 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
               )}
             </div>
 
-            {workflowSteps.length === 0 ? (
-              <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl h-64 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 bg-white/50 dark:bg-slate-800/30">
-                <Layout className="w-12 h-12 mb-3 text-slate-300 dark:text-slate-600" />
-                <p className="font-medium">{t('canvas.empty.title')}</p>
-                <p className="text-sm">{t('canvas.empty.subtitle')}</p>
-              </div>
-            ) : (
-              <div className="space-y-4 pb-20">
-                {workflowSteps.map((step, index) => (
-                  <div key={step.id} className="relative">
-                    <WorkflowNode
-                      step={step}
-                      index={index}
-                      tool={availableTools.find((t) => t.id === step.toolId)}
-                      onDelete={handleDeleteStep}
-                      onDragStart={handleDragStart}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                    />
-                    {index < workflowSteps.length - 1 && (
-                      <div className="absolute left-6 -bottom-5 text-slate-300 dark:text-slate-600 z-0">
-                        <ArrowDown size={16} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="h-[640px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-inner overflow-hidden">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                fitView
+                nodeTypes={nodeTypes}
+                defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
+              >
+                <MiniMap pannable zoomable />
+                <Controls />
+                <Background gap={16} size={1} />
+              </ReactFlow>
+              {nodes.length === 0 && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 pointer-events-none">
+                  <Layout className="w-12 h-12 mb-3 text-slate-300 dark:text-slate-600" />
+                  <p className="font-medium">{t('canvas.empty.title')}</p>
+                  <p className="text-sm">{t('canvas.empty.subtitle')}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
