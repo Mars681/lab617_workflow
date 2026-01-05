@@ -49,7 +49,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
   const { t, i18n } = useTranslation();
 
   // State
-  const [workflowName, setWorkflowName] = useState('Example Workflow');
+  const [workflowName, setWorkflowName] = useState(() => t('config.defaultName'));
   const [globalInput, setGlobalInput] = useState(DEFAULT_INPUT_JSON);
   const [isEditingInput, setIsEditingInput] = useState(false);
   const [nodes, setNodes] = useState<Node<FlowNodeData>[]>([]);
@@ -197,7 +197,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
 
   const handleUploadMat = async () => {
     if (!matFile) {
-      setUploadMsg('Please select a .mat or .csv file first.');
+      setUploadMsg(t('upload.pickFile'));
       return;
     }
 
@@ -223,9 +223,9 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       obj.prefix = obj.prefix ?? 'dipca';
 
       setGlobalInput(JSON.stringify(obj, null, 2));
-      setUploadMsg(`Upload succeeded: ${res.filename} \u2192 ${res.mat_path}`);
+      setUploadMsg(t('upload.success', { filename: res.filename, path: res.mat_path }));
     } catch (e: any) {
-      setUploadMsg(`Upload failed: ${e?.message || e}`);
+      setUploadMsg(t('upload.failure', { message: e?.message || e }));
     } finally {
       setIsUploading(false);
     }
@@ -240,7 +240,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
     (toolId: string) => {
       const exists = availableTools.some((t) => t.id === toolId);
       if (!exists) {
-        alert(`工具未注册到后端工具池：${toolId}\n请检查 getAvailableTools() 是否返回该工具。`);
+        alert(t('alert.toolNotRegistered', { toolId }));
         return;
       }
       const tool = availableTools.find((t) => t.id === toolId);
@@ -311,7 +311,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
     try {
       baseInput = JSON.parse(globalInput);
     } catch (e) {
-      alert('Invalid JSON Input');
+      alert(t('input.invalidJsonAlert'));
       setIsExecuting(false);
       return;
     }
@@ -328,7 +328,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
 
     const roots = nodes.filter((n) => !incomingMap[n.id] || incomingMap[n.id].length === 0);
     if (roots.length === 0) {
-      alert('No entry nodes found. Please add at least one node with no incoming edges.');
+      alert(t('alert.noEntryNodes'));
       setIsExecuting(false);
       return;
     }
@@ -373,7 +373,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
 
     while (stack.length > 0) {
       if (processed > maxRuns) {
-        alert('Detected a possible cycle or runaway branching; execution was stopped.');
+        alert(t('alert.cycleDetected'));
         break;
       }
       processed += 1;
@@ -497,7 +497,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
               </label>
               <div className="space-y-2">
                 {availableTools.length === 0 ? (
-                  <div className="text-xs text-slate-400 p-2 italic text-center">Loading tools...</div>
+                  <div className="text-xs text-slate-400 p-2 italic text-center">{t('toolbox.loading')}</div>
                 ) : (
                   availableTools.map((tool) => (
                     <div
@@ -525,9 +525,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
 
             {/* MAT/CSV Upload */}
             <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-700">
-              <label className="text-xs font-semibold uppercase text-slate-400 tracking-wider">.mat .csv Upload</label>
+              <label className="text-xs font-semibold uppercase text-slate-400 tracking-wider">{t('upload.title')}</label>
 
               <input
+                id="mat-upload"
                 type="file"
                 accept=".mat,.csv"
                 onChange={(e) => {
@@ -535,15 +536,20 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                   setMatFile(f);
                   setUploadMsg(null);
                 }}
-                className="block w-full text-xs text-slate-500
-                  file:mr-3 file:py-1.5 file:px-3
-                  file:rounded-lg file:border-0
-                  file:text-xs file:font-semibold
-                  file:bg-slate-100 file:text-slate-700
-                  hover:file:bg-slate-200
-                  dark:file:bg-slate-700 dark:file:text-slate-200
-                  dark:hover:file:bg-slate-600"
+                className="hidden"
               />
+
+              <div className="flex items-center gap-3">
+                <label
+                  htmlFor="mat-upload"
+                  className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-100 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer transition"
+                >
+                  {t('upload.choose')}
+                </label>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                  {matFile ? matFile.name : t('upload.noFile')}
+                </span>
+              </div>
 
               <button
                 onClick={handleUploadMat}
@@ -554,7 +560,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                     : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 }`}
               >
-                {isUploading ? 'Uploading…' : 'Upload to backend and write into JSON (.mat / .csv)'}
+                {isUploading ? t('upload.uploading') : t('upload.button')}
               </button>
 
               {uploadMsg && (
@@ -600,7 +606,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                       <DataVisualizer data={parsedGlobalInput} rootMode={true} className="text-[10px]" />
                     ) : (
                       <div className="text-red-500 text-xs p-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-100 dark:border-red-900/30">
-                        Invalid JSON syntax.
+                        {t('input.invalidJson')}
                       </div>
                     )}
                   </div>
@@ -685,7 +691,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
             onMouseDown={startResizeLogs}
             className="hidden md:block absolute left-0 top-0 h-full w-1.5 cursor-col-resize
                        bg-transparent hover:bg-indigo-500/20 active:bg-indigo-500/30 z-20"
-            title="拖拽调整日志面板宽度"
+            title={t('logs.resize.title')}
           />
 
           <div
@@ -750,7 +756,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                             rel="noopener noreferrer"
                             className="inline-block mt-2 text-indigo-600 hover:text-indigo-800 underline text-xs"
                           >
-                            📊 点击打开 DiPCA 监控图
+                            {t('logs.openChart')}
                           </a>
                         )}
                       </div>

@@ -2,10 +2,14 @@ import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { en } from './locales/en';
 import { zh } from './locales/zh';
+import { fr } from './locales/fr';
+import { ar } from './locales/ar';
 
 const resources = {
   en: { translation: en },
-  zh: { translation: zh }
+  zh: { translation: zh },
+  fr: { translation: fr },
+  ar: { translation: ar }
 };
 
 // Handle ESM default export inconsistencies (common in non-bundled environments like esm.sh)

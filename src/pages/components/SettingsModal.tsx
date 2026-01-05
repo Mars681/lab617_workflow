@@ -250,10 +250,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, s
               <div className="space-y-3">
                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Globe size={14} />{t('settings.language')}</label>
                  <div className="grid grid-cols-2 gap-3">
-                    {['en', 'zh'].map(lang => (
-                        <button key={lang} onClick={() => changeLanguage(lang)} className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all ${i18n.language === lang ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                            <span className="text-sm font-medium">{lang === 'en' ? 'English' : '中文'}</span>
-                            {i18n.language === lang && <Check size={16} className="text-indigo-600 dark:text-indigo-400" />}
+                    {[
+                      { code: 'en', label: 'English' },
+                      { code: 'zh', label: '中文' },
+                      { code: 'fr', label: 'Français' },
+                      { code: 'ar', label: 'العربية' }
+                    ].map(lang => (
+                        <button key={lang.code} onClick={() => changeLanguage(lang.code)} className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all ${i18n.language === lang.code ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                            <span className="text-sm font-medium">{lang.label}</span>
+                            {i18n.language === lang.code && <Check size={16} className="text-indigo-600 dark:text-indigo-400" />}
                         </button>
                     ))}
                  </div>
