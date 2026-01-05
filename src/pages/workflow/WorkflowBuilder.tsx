@@ -342,26 +342,43 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
     };
 
     const initialContext = { global_input: baseInput };
-    const queue: ExecutionTask[] = roots.map((node, idx) => ({
-      nodeId: node.id,
-      depth: 1,
-      pathId: `path-${idx + 1}`,
-      context: initialContext,
-      prevOutput: null,
-    }));
+    const toLevelLabel = (depth: number) => {
+      // depth is 1-based; depth 1 -> A, depth 2 -> B ...
+      let n = depth - 1;
+      let label = '';
+      while (n >= 0) {
+        label = String.fromCharCode(65 + (n % 26)) + label;
+        n = Math.floor(n / 26) - 1;
+      }
+      return label;
+    };
 
+    const levelStepCounters: Record<number, number> = {};
+    const initialTasks: ExecutionTask[] = roots.map((node, idx) => {
+      const pathId = toLevelLabel(1);
+      levelStepCounters[1] = 0;
+      return {
+        nodeId: node.id,
+        depth: 1,
+        pathId,
+        context: initialContext,
+        prevOutput: null,
+      };
+    });
+
+    const stack: ExecutionTask[] = [...initialTasks].reverse();
     const logs: ExecutionLog[] = [];
     let processed = 0;
     const maxRuns = nodes.length * Math.max(2, edges.length + 1) * 4;
 
-    while (queue.length > 0) {
+    while (stack.length > 0) {
       if (processed > maxRuns) {
         alert('Detected a possible cycle or runaway branching; execution was stopped.');
         break;
       }
       processed += 1;
 
-      const task = queue.shift()!;
+      const task = stack.pop()!;
       const node = nodes.find((n) => n.id === task.nodeId);
       if (!node) continue;
 
@@ -377,6 +394,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         path_id: task.pathId,
       };
       const requestKeys = Object.keys(contextForTool);
+      const currentStepIndex = (levelStepCounters[task.depth] ?? 0) + 1;
+      levelStepCounters[task.depth] = currentStepIndex;
 
       try {
         const res: any = await executeTool(tool.id, contextForTool);
@@ -385,9 +404,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         const responseForLog = res?.output ?? res;
 
         const logEntry: ExecutionLog = {
-          stepIndex: task.depth,
+          stepIndex: currentStepIndex,
           stepName: tool?.name || node.data.toolName,
           toolId: tool?.id || node.data.toolId,
+          pathId: task.pathId,
           request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId, path_id: task.pathId },
           response: responseForLog,
           status: 'success',
@@ -400,21 +420,24 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         const outgoing = outgoingMap[node.id] || [];
         if (outgoing.length === 0) continue;
 
-        outgoing.forEach((toId, idx) => {
-          const nextPathId = outgoing.length > 1 ? `${task.pathId}.${idx + 1}` : task.pathId;
-          queue.push({
-            nodeId: toId,
-            depth: task.depth + 1,
-            pathId: nextPathId,
-            context: nextContext,
-            prevOutput: payload,
+        outgoing
+          .slice()
+          .reverse()
+          .forEach((toId) => {
+            stack.push({
+              nodeId: toId,
+              depth: task.depth + 1,
+              pathId: toLevelLabel(task.depth + 1),
+              context: nextContext,
+              prevOutput: payload,
+            });
           });
-        });
       } catch (error: any) {
         const logEntry: ExecutionLog = {
-          stepIndex: task.depth,
+          stepIndex: currentStepIndex,
           stepName: tool?.name || node.data.toolName,
           toolId: tool?.id || node.data.toolId,
+          pathId: task.pathId,
           request: { context_keys: requestKeys, tool: tool?.id || node.data.toolId, path_id: task.pathId },
           response: { error: error?.message || 'Execution Failed' },
           status: 'error',
@@ -696,8 +719,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                   >
                     <div className="flex justify-between items-center mb-2 border-b border-slate-50 dark:border-slate-700 pb-2">
                       <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                        <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">
-                          {log.stepIndex}
+                        <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">
+                          {log.pathId ? `${log.pathId}${log.stepIndex}` : log.stepIndex}
                         </span>
                         {log.stepName}
                       </span>

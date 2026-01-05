@@ -27,6 +27,7 @@ export interface ExecutionLog {
   stepIndex: number;
   stepName: string;
   toolId: string;
+  pathId?: string;
   request: any;
   response: any;
   status: 'success' | 'error';
