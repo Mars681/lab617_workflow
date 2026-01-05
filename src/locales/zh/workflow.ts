@@ -17,6 +17,7 @@ export const workflow = {
   "canvas.clear": "清空全部",
   "canvas.empty.title": "工作流为空",
   "canvas.empty.subtitle": "点击左侧工具或让 AI 帮你构建。",
+  "canvas.deleteEdge": "删除连线",
 
   "upload.title": ".mat/.csv 上传",
   "upload.pickFile": "请先选择 .mat 或 .csv 文件。",

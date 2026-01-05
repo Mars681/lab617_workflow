@@ -57,6 +57,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
   const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [edgeAction, setEdgeAction] = useState<{ id: string; x: number; y: number } | null>(null);
+  const flowWrapperRef = React.useRef<HTMLDivElement | null>(null);
 
   // MAT upload state
   const [matFile, setMatFile] = useState<File | null>(null);
@@ -291,6 +293,20 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
     (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
     []
   );
+
+  const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.stopPropagation();
+    const rect = flowWrapperRef.current?.getBoundingClientRect();
+    const x = rect ? event.clientX - rect.left : event.clientX;
+    const y = rect ? event.clientY - rect.top : event.clientY;
+    setEdgeAction({ id: edge.id, x, y });
+  }, []);
+
+  const handleDeleteEdge = useCallback(() => {
+    if (!edgeAction) return;
+    setEdges((prev) => prev.filter((e) => e.id !== edgeAction.id));
+    setEdgeAction(null);
+  }, [edgeAction]);
 
   const onConnect = useCallback(
     (connection: FlowConnection) =>
@@ -641,7 +657,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         </aside>
 
         {/* Canvas */}
-        <div className="flex-1 bg-slate-50/50 dark:bg-slate-900 p-8 overflow-y-auto flex flex-col relative transition-colors">
+        <div
+          className="flex-1 bg-slate-50/50 dark:bg-slate-900 p-8 overflow-y-auto flex flex-col relative transition-colors"
+          ref={flowWrapperRef}
+        >
           <div className="max-w-6xl mx-auto w-full">
             <div className="flex justify-between items-end mb-6">
               <div>
@@ -665,6 +684,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+                onEdgeClick={onEdgeClick}
                 fitView
                 nodeTypes={nodeTypes}
                 defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
@@ -679,6 +699,15 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                   <p className="font-medium">{t('canvas.empty.title')}</p>
                   <p className="text-sm">{t('canvas.empty.subtitle')}</p>
                 </div>
+              )}
+              {edgeAction && (
+                <button
+                  onClick={handleDeleteEdge}
+                  className="absolute z-30 -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold shadow-lg hover:bg-red-700 transition"
+                  style={{ left: edgeAction.x, top: edgeAction.y }}
+                >
+                  {t('canvas.deleteEdge')}
+                </button>
               )}
             </div>
           </div>

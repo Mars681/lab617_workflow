@@ -17,6 +17,7 @@ export const workflow = {
   "canvas.clear": "Tout effacer",
   "canvas.empty.title": "Le workflow est vide",
   "canvas.empty.subtitle": "Cliquez sur les outils à gauche ou demandez à l'IA de le construire.",
+  "canvas.deleteEdge": "Supprimer la connexion",
 
   "upload.title": "Import .mat/.csv",
   "upload.pickFile": "Veuillez d'abord sélectionner un fichier .mat ou .csv.",

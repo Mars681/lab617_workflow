@@ -17,6 +17,7 @@ export const workflow = {
   "canvas.clear": "مسح الكل",
   "canvas.empty.title": "سير العمل فارغ",
   "canvas.empty.subtitle": "انقر أدوات اليسار أو اطلب من الذكاء الاصطناعي البناء.",
+  "canvas.deleteEdge": "حذف الاتصال",
 
   "upload.title": "رفع .mat/.csv",
   "upload.pickFile": "يرجى اختيار ملف .mat أو .csv أولاً.",
