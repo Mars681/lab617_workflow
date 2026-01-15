@@ -59,7 +59,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [edgeAction, setEdgeAction] = useState<{ id: string; x: number; y: number } | null>(null);
   const flowWrapperRef = React.useRef<HTMLDivElement | null>(null);
-  const [llmGraphDebug, setLlmGraphDebug] = useState<WorkflowGraphRequest | null>(null);
+  const [llmGraphSteps, setLlmGraphSteps] = useState<any[]>([]);
+  const [llmBatchId, setLlmBatchId] = useState(0);
   const [isGraphOpen, setIsGraphOpen] = useState(false);
 
   // MAT upload state
@@ -250,8 +251,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       const tool = availableTools.find((t) => t.id === toolId);
       setNodes((prev) => {
         const idx = prev.length;
+        const prevLastId = prev.length > 0 ? prev[prev.length - 1].id : null;
+        const newId = uuidv4();
         const newNode: Node<FlowNodeData> = {
-          id: uuidv4(),
+          id: newId,
           type: 'tool',
           position: { x: 160 + (idx % 3) * 220, y: 80 + Math.floor(idx / 3) * 160 },
           data: {
@@ -262,6 +265,23 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
             onDelete: handleDeleteStep,
           },
         };
+        if (prevLastId) {
+          setEdges((edgesPrev) => {
+            const key = `${prevLastId}->${newId}`;
+            const hasEdge = edgesPrev.some((e) => `${e.source}->${e.target}` === key);
+            if (hasEdge) return edgesPrev;
+            return [
+              ...edgesPrev,
+              {
+                id: `e-${uuidv4()}`,
+                source: prevLastId,
+                target: newId,
+                type: 'smoothstep',
+                animated: true,
+              },
+            ];
+          });
+        }
         return [...prev, newNode];
       });
     },
@@ -400,14 +420,21 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
         setEdges([]);
         setNodes([]);
       }
+      setLlmGraphSteps((prev) => [...prev, { type: 'step', tool_id: toolId, reset }]);
       handleAddStep(toolId);
     },
     [handleAddStep]
   );
 
+  const handleAssistantBatchStart = useCallback(() => {
+    setLlmBatchId((prev) => prev + 1);
+    setLlmGraphSteps([]);
+    setIsGraphOpen(true);
+  }, []);
+
   const handleAssistantGraphAction = useCallback(
     (graph: WorkflowGraphRequest) => {
-      setLlmGraphDebug(graph);
+      setLlmGraphSteps((prev) => [...prev, { type: 'graph', ...graph }]);
       setIsGraphOpen(true);
       const existingIds = new Set(nodes.map((n) => n.id));
       const built = buildGraphFromRequest(graph, graph.reset ? new Set() : existingIds);
@@ -889,7 +916,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-900 space-y-3 font-mono text-xs">
-              {llmGraphDebug && (
+              {llmGraphSteps.length > 0 && (
                 <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
                   <button
                     onClick={() => setIsGraphOpen((prev) => !prev)}
@@ -900,7 +927,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                   </button>
                   {isGraphOpen && (
                     <pre className="px-3 pb-3 text-[10px] whitespace-pre-wrap break-words text-slate-600 dark:text-slate-300">
-                      {JSON.stringify(llmGraphDebug, null, 2)}
+                      {JSON.stringify({ batch_id: llmBatchId, steps: llmGraphSteps }, null, 2)}
                     </pre>
                   )}
                 </div>
@@ -969,6 +996,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       <ChatAssistant
         onAddTool={handleAssistantToolAction}
         onApplyGraph={handleAssistantGraphAction}
+        onStartBatch={handleAssistantBatchStart}
         providerId={providerId}
       />
 

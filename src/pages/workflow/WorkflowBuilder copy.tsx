@@ -655,6 +655,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       <ChatAssistant
         onAddTool={handleAssistantToolAction}
         onApplyGraph={() => {}}
+        onStartBatch={() => {}}
         providerId={providerId}
       />
 

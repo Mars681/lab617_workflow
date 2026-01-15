@@ -405,13 +405,18 @@ export const streamWorkflowChat = async (
   let reasoningOpen = false;
 
   try {
+    const wantsGraph = /连线|流程|->|分支|自动连线|画.*流程|graph|workflow/i.test(message);
+    const toolChoice: OpenAIToolChoice = wantsGraph
+      ? { type: "function", function: { name: "record_graph" } }
+      : { type: "function", function: { name: "record_step" } };
+
     await streamChatCompletions(
       ctx,
       {
         model: ctx.model,
         messages,
         tools: workflowTools,
-        tool_choice: "auto" as OpenAIToolChoice,
+        tool_choice: toolChoice,
       },
       (delta) => {
         const content = delta.content || "";

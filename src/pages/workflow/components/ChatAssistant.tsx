@@ -8,10 +8,11 @@ import MessageContent from '../../chat/components/MessageContent';
 interface ChatAssistantProps {
   onAddTool: (toolId: string, reset: boolean) => void;
   onApplyGraph: (graph: WorkflowGraphRequest) => void;
+  onStartBatch: () => void;
   providerId: string;
 }
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ onAddTool, onApplyGraph, providerId }) => {
+const ChatAssistant: React.FC<ChatAssistantProps> = ({ onAddTool, onApplyGraph, onStartBatch, providerId }) => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -47,6 +48,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onAddTool, onApplyGraph, 
 
     const userMsg = input.trim();
     setInput('');
+    onStartBatch();
 
     // 先把用户消息 + 模型占位加进去
     setMessages(prev => [
