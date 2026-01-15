@@ -13,7 +13,7 @@ export const workflow = {
   "toolbox.loading": "加载工具中...",
 
   "canvas.title": "工作流步骤",
-  "canvas.subtitle": "拖拽项目以重新排序逻辑执行顺序。",
+  "canvas.subtitle": "点击左侧工具或让 AI 帮你构建。",
   "canvas.clear": "清空全部",
   "canvas.empty.title": "工作流为空",
   "canvas.empty.subtitle": "点击左侧工具或让 AI 帮你构建。",
@@ -45,7 +45,7 @@ export const workflow = {
   "workflow.help.welcome": "欢迎使用编排器",
   "workflow.help.subtitle": "MCP 工具的可视化工作流构建器",
   "workflow.help.step1.title": "构建",
-  "workflow.help.step1.desc": "点击工具箱中的工具，或在中间画布拖拽步骤以重新排序。",
+  "workflow.help.step1.desc": "点击工具箱中的工具，或让 AI 帮你构建步骤。",
   "workflow.help.step2.title": "执行",
   "workflow.help.step2.desc": "点击左侧边栏紫色的“运行工作流”按钮来执行你的逻辑。",
   "workflow.help.step3.title": "AI 辅助",

@@ -13,7 +13,7 @@ export const workflow = {
   "toolbox.loading": "Loading tools...",
   
   "canvas.title": "Workflow Steps",
-  "canvas.subtitle": "Drag items to reorder logic execution.",
+  "canvas.subtitle": "Click tools on the left or ask AI to build it.",
   "canvas.clear": "Clear All",
   "canvas.empty.title": "Workflow is empty",
   "canvas.empty.subtitle": "Click tools on the left or ask AI to build it.",
@@ -45,7 +45,7 @@ export const workflow = {
   "workflow.help.welcome": "Welcome to Orchestrator",
   "workflow.help.subtitle": "Visual Workflow Builder for MCP Tools",
   "workflow.help.step1.title": "Build",
-  "workflow.help.step1.desc": "Click tools in the Toolbox or drag steps to reorder them in the center canvas.",
+  "workflow.help.step1.desc": "Click tools in the Toolbox or ask AI to build steps for you.",
   "workflow.help.step2.title": "Execute",
   "workflow.help.step2.desc": "Click the purple \"Run Workflow\" button on the left sidebar to execute your logic.",
   "workflow.help.step3.title": "AI Assist",

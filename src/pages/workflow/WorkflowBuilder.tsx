@@ -11,6 +11,7 @@ import ReactFlow, {
   Node,
   EdgeChange,
   NodeChange,
+  ControlButton,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
@@ -62,6 +63,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
   const [llmGraphSteps, setLlmGraphSteps] = useState<any[]>([]);
   const [llmBatchId, setLlmBatchId] = useState(0);
   const [isGraphOpen, setIsGraphOpen] = useState(false);
+  const [isLogsCollapsed, setIsLogsCollapsed] = useState(false);
 
   // MAT upload state
   const [matFile, setMatFile] = useState<File | null>(null);
@@ -836,26 +838,15 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
 
         {/* Canvas */}
         <div
-          className="flex-1 bg-slate-50/50 dark:bg-slate-900 p-8 overflow-y-auto flex flex-col relative transition-colors"
+          className="flex-1 bg-slate-50/50 dark:bg-slate-900 p-4 overflow-y-auto flex flex-col relative transition-colors"
           ref={flowWrapperRef}
         >
-          <div className="max-w-6xl mx-auto w-full">
+          <div className="max-w-none mx-auto w-full">
             <div className="flex justify-between items-end mb-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{t('canvas.title')}</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{t('canvas.subtitle')}</p>
-              </div>
-              {nodes.length > 0 && (
-                <button
-                  onClick={handleResetWorkflow}
-                  className="text-xs font-medium text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                >
-                  <Trash2 size={14} /> {t('canvas.clear')}
-                </button>
-              )}
+              <div />
             </div>
 
-            <div className="h-[700px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-inner overflow-hidden">
+            <div className="h-[830px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-inner overflow-hidden">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -868,16 +859,15 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
                 defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
               >
                 <MiniMap pannable zoomable />
-                <Controls />
+                <Controls position="bottom-left">
+                  {nodes.length > 0 && (
+                    <ControlButton onClick={handleResetWorkflow} title={t('canvas.clear')}>
+                      <Trash2 size={16} />
+                    </ControlButton>
+                  )}
+                </Controls>
                 <Background gap={16} size={1} />
               </ReactFlow>
-              {nodes.length === 0 && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 pointer-events-none">
-                  <Layout className="w-12 h-12 mb-3 text-slate-300 dark:text-slate-600" />
-                  <p className="font-medium">{t('canvas.empty.title')}</p>
-                  <p className="text-sm">{t('canvas.empty.subtitle')}</p>
-                </div>
-              )}
               {edgeAction && (
                 <button
                   onClick={handleDeleteEdge}
@@ -889,6 +879,15 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
               )}
             </div>
           </div>
+          {isLogsCollapsed && (
+            <button
+              onClick={() => setIsLogsCollapsed(false)}
+              className="fixed right-3 top-24 z-50 w-8 h-8 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-lg shadow-indigo-500/30 transition flex items-center justify-center"
+              title="展开日志"
+            >
+              &lt;
+            </button>
+          )}
         </div>
 
         {/* ✅ Logs (Resizable on desktop) */}
@@ -896,23 +895,34 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
           {/* Drag handle: desktop only */}
           <div
             onMouseDown={startResizeLogs}
-            className="hidden md:block absolute left-0 top-0 h-full w-1.5 cursor-col-resize
-                       bg-transparent hover:bg-indigo-500/20 active:bg-indigo-500/30 z-20"
+            className={`hidden md:block absolute left-0 top-0 h-full w-1.5 cursor-col-resize
+                       bg-transparent hover:bg-indigo-500/20 active:bg-indigo-500/30 z-20 ${
+                         isLogsCollapsed ? 'opacity-0 pointer-events-none' : ''
+                       }`}
             title={t('logs.resize.title')}
           />
 
           <div
-            className={`bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 flex flex-col h-full transition-colors ${
+            className={`bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 flex flex-col h-full transition-colors overflow-hidden ${
               isResizingLogs ? 'select-none' : ''
-            }`}
-            style={{ width: logsWidth }}
+            } ${isLogsCollapsed ? 'pointer-events-none opacity-0' : ''}`}
+            style={{ width: isLogsCollapsed ? 0 : logsWidth }}
           >
             <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
               <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                 <Terminal size={16} className="text-emerald-600 dark:text-emerald-400" />
                 {t('logs.title')}
               </h2>
-              {isExecuting && <Activity size={16} className="text-indigo-500 animate-pulse" />}
+              <div className="flex items-center gap-2">
+                {isExecuting && <Activity size={16} className="text-indigo-500 animate-pulse" />}
+                <button
+                  onClick={() => setIsLogsCollapsed(true)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition"
+                  title="Collapse"
+                >
+                  <ChevronRight size={16} className="rotate-180" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-900 space-y-3 font-mono text-xs">
