@@ -652,7 +652,11 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       </div>
 
       {/* Floating Chat Assistant */}
-      <ChatAssistant onAddTool={handleAssistantToolAction} providerId={providerId} />
+      <ChatAssistant
+        onAddTool={handleAssistantToolAction}
+        onApplyGraph={() => {}}
+        providerId={providerId}
+      />
 
       {/* Help Modal */}
       {showHelp && (

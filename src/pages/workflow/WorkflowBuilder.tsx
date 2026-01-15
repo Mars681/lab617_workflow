@@ -31,7 +31,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 
 import { DEFAULT_INPUT_JSON } from '../../constants';
-import { ExecutionLog, MCPTool } from '../../types';
+import { ExecutionLog, MCPTool, WorkflowGraphRequest } from '../../types';
 import WorkflowNode, { FlowNodeData } from './components/WorkflowNode';
 import ChatAssistant from './components/ChatAssistant';
 import DataVisualizer from '../components/DataVisualizer';
@@ -59,6 +59,8 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [edgeAction, setEdgeAction] = useState<{ id: string; x: number; y: number } | null>(null);
   const flowWrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const [llmGraphDebug, setLlmGraphDebug] = useState<WorkflowGraphRequest | null>(null);
+  const [isGraphOpen, setIsGraphOpen] = useState(false);
 
   // MAT upload state
   const [matFile, setMatFile] = useState<File | null>(null);
@@ -272,6 +274,125 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
     setExecutionLogs([]);
   };
 
+  const buildLinearEdges = (nodeIds: string[]): Edge[] => {
+    const edgesOut: Edge[] = [];
+    for (let i = 0; i < nodeIds.length - 1; i += 1) {
+      edgesOut.push({
+        id: `e-${uuidv4()}`,
+        source: nodeIds[i],
+        target: nodeIds[i + 1],
+        type: 'smoothstep',
+        animated: true,
+      });
+    }
+    return edgesOut;
+  };
+
+  const hasCycle = (nodeIds: string[], edgeList: Edge[]): boolean => {
+    const adj = new Map<string, string[]>();
+    nodeIds.forEach((id) => adj.set(id, []));
+    edgeList.forEach((e) => {
+      if (!adj.has(e.source)) adj.set(e.source, []);
+      adj.get(e.source)!.push(e.target);
+    });
+
+    const state = new Map<string, 0 | 1 | 2>();
+    const dfs = (nodeId: string): boolean => {
+      const s = state.get(nodeId) ?? 0;
+      if (s === 1) return true;
+      if (s === 2) return false;
+      state.set(nodeId, 1);
+      const next = adj.get(nodeId) || [];
+      for (const n of next) {
+        if (dfs(n)) return true;
+      }
+      state.set(nodeId, 2);
+      return false;
+    };
+
+    for (const id of nodeIds) {
+      if (dfs(id)) return true;
+    }
+    return false;
+  };
+
+  const buildGraphFromRequest = (
+    graph: WorkflowGraphRequest,
+    existingIds: Set<string>
+  ): { nodes: Node<FlowNodeData>[]; edges: Edge[] } | null => {
+    const toolById = new Map(availableTools.map((t) => [t.id, t]));
+    const requestedNodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+
+    const nodeIdMap = new Map<string, string>();
+    const usedIds = new Set<string>(existingIds);
+    const newNodes: Node<FlowNodeData>[] = [];
+
+    let idx = 0;
+    for (const n of requestedNodes) {
+      const toolId = n?.tool_id;
+      if (!toolId || !toolById.has(toolId)) continue;
+
+      const rawId = typeof n.id === 'string' ? n.id.trim() : '';
+      const nextId =
+        rawId && !usedIds.has(rawId) ? rawId : uuidv4();
+
+      if (rawId) nodeIdMap.set(rawId, nextId);
+      usedIds.add(nextId);
+
+      const tool = toolById.get(toolId);
+      newNodes.push({
+        id: nextId,
+        type: 'tool',
+        position: { x: 160 + (idx % 3) * 220, y: 80 + Math.floor(idx / 3) * 160 },
+        data: {
+          toolId,
+          toolName: tool?.name || toolId,
+          toolDescription: tool?.description || toolId,
+          category: (tool?.category as MCPTool['category']) || 'utility',
+          onDelete: handleDeleteStep,
+        },
+      });
+      idx += 1;
+    }
+
+    if (newNodes.length === 0) return null;
+
+    const idSet = new Set(newNodes.map((n) => n.id));
+    const edgeSet = new Set<string>();
+    const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
+    const newEdges: Edge[] = [];
+
+    for (const e of rawEdges) {
+      if (!e) continue;
+      const sourceRaw = typeof e.source === 'string' ? e.source.trim() : '';
+      const targetRaw = typeof e.target === 'string' ? e.target.trim() : '';
+      if (!sourceRaw || !targetRaw) continue;
+
+      const source = nodeIdMap.get(sourceRaw) ?? sourceRaw;
+      const target = nodeIdMap.get(targetRaw) ?? targetRaw;
+      if (!idSet.has(source) || !idSet.has(target) || source === target) continue;
+
+      const key = `${source}->${target}`;
+      if (edgeSet.has(key)) continue;
+      edgeSet.add(key);
+
+      newEdges.push({
+        id: `e-${uuidv4()}`,
+        source,
+        target,
+        type: 'smoothstep',
+        animated: true,
+      });
+    }
+
+    let finalEdges = newEdges.length > 0 ? newEdges : buildLinearEdges(newNodes.map((n) => n.id));
+    if (hasCycle(newNodes.map((n) => n.id), finalEdges)) {
+      finalEdges = buildLinearEdges(newNodes.map((n) => n.id));
+    }
+
+    return { nodes: newNodes, edges: finalEdges };
+  };
+
   // Chat Assistant callback
   const handleAssistantToolAction = useCallback(
     (toolId: string, reset: boolean) => {
@@ -282,6 +403,36 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       handleAddStep(toolId);
     },
     [handleAddStep]
+  );
+
+  const handleAssistantGraphAction = useCallback(
+    (graph: WorkflowGraphRequest) => {
+      setLlmGraphDebug(graph);
+      setIsGraphOpen(true);
+      const existingIds = new Set(nodes.map((n) => n.id));
+      const built = buildGraphFromRequest(graph, graph.reset ? new Set() : existingIds);
+      if (!built) return;
+
+      if (graph.reset) {
+        setNodes(built.nodes);
+        setEdges(built.edges);
+        return;
+      }
+
+      setNodes((prev) => [...prev, ...built.nodes]);
+      setEdges((prev) => {
+        const merged = [...prev];
+        const existingKeys = new Set(prev.map((e) => `${e.source}->${e.target}`));
+        for (const e of built.edges) {
+          const key = `${e.source}->${e.target}`;
+          if (existingKeys.has(key)) continue;
+          existingKeys.add(key);
+          merged.push(e);
+        }
+        return merged;
+      });
+    },
+    [nodes, buildGraphFromRequest]
   );
 
   const onNodesChange = useCallback(
@@ -738,6 +889,22 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-900 space-y-3 font-mono text-xs">
+              {llmGraphDebug && (
+                <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <button
+                    onClick={() => setIsGraphOpen((prev) => !prev)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-left"
+                  >
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">LLM Graph</span>
+                    <span className="text-[10px] text-slate-400">{isGraphOpen ? 'hide' : 'show'}</span>
+                  </button>
+                  {isGraphOpen && (
+                    <pre className="px-3 pb-3 text-[10px] whitespace-pre-wrap break-words text-slate-600 dark:text-slate-300">
+                      {JSON.stringify(llmGraphDebug, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
               {executionLogs.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
                   <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-3">
@@ -799,7 +966,11 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ providerId }) => {
       </div>
 
       {/* Floating Chat Assistant */}
-      <ChatAssistant onAddTool={handleAssistantToolAction} providerId={providerId} />
+      <ChatAssistant
+        onAddTool={handleAssistantToolAction}
+        onApplyGraph={handleAssistantGraphAction}
+        providerId={providerId}
+      />
 
       {/* Help Modal */}
       {showHelp && (

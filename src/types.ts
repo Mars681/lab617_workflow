@@ -10,6 +10,22 @@ export interface WorkflowStep {
   toolId: string;
 }
 
+export interface WorkflowGraphRequestNode {
+  id?: string;
+  tool_id: string;
+}
+
+export interface WorkflowGraphRequestEdge {
+  source: string;
+  target: string;
+}
+
+export interface WorkflowGraphRequest {
+  reset?: boolean;
+  nodes: WorkflowGraphRequestNode[];
+  edges?: WorkflowGraphRequestEdge[];
+}
+
 // Graph-based workflow node (can replace WorkflowStep; kept separate for clarity)
 export interface WorkflowNode {
   id: string;

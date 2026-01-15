@@ -198,6 +198,7 @@ ${toolsDescription}
 When a user asks to "add matrix addition" or "use data normalization" (or equivalent in other languages), you MUST call the \`record_step\` function.
 The \`tool_id\` argument must be one of the valid IDs listed above.
 If the user wants to clear the workflow, set \`reset\` to true.
+When the user asks to connect nodes automatically, build a workflow graph, or provide node connections, call \`record_graph\` with a list of nodes and edges.
 Answer the user in a helpful, concise manner in the same language they used.
 `;
 };
@@ -232,7 +233,57 @@ const recordStepTool: OpenAITool = {
   },
 };
 
-const workflowTools: OpenAITool[] = [recordStepTool];
+const recordGraphTool: OpenAITool = {
+  type: "function",
+  function: {
+    name: "record_graph",
+    description: "Record a workflow graph with nodes and edges.",
+    parameters: {
+      type: "object",
+      properties: {
+        reset: {
+          type: "boolean",
+          description: "Whether to clear existing steps before applying the graph.",
+        },
+        nodes: {
+          type: "array",
+          description: "Ordered list of nodes in the graph.",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Optional stable node id." },
+              tool_id: {
+                type: "string",
+                enum: validToolIds,
+                description: `The tool id for this node. Valid options: ${validToolIds.join(", ")}`,
+              },
+            },
+            required: ["tool_id"],
+            additionalProperties: false,
+          },
+          minItems: 1,
+        },
+        edges: {
+          type: "array",
+          description: "Directed edges between node ids.",
+          items: {
+            type: "object",
+            properties: {
+              source: { type: "string" },
+              target: { type: "string" },
+            },
+            required: ["source", "target"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["nodes"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const workflowTools: OpenAITool[] = [recordStepTool, recordGraphTool];
 
 // --------------------------
 // Core request helpers
@@ -321,6 +372,11 @@ export const streamWorkflowChat = async (
   message: string,
   onChunk: (chunk: string) => void,
   onToolCall: (toolId: string, reset: boolean) => Promise<{ ok: boolean; message: string }>,
+  onGraphCall: (graph: {
+    reset?: boolean;
+    nodes: { id?: string; tool_id: string }[];
+    edges?: { source: string; target: string }[];
+  }) => Promise<{ ok: boolean; message: string }>,
   providerId?: string,
   signal?: AbortSignal
 ): Promise<void> => {
@@ -334,7 +390,7 @@ export const streamWorkflowChat = async (
     model: ctx.model,
     message,
     historyLength: history.length,
-    tools: ["record_step"],
+    tools: ["record_step", "record_graph"],
   });
 
   const messages: OpenAIMessage[] = [
@@ -422,19 +478,38 @@ export const streamWorkflowChat = async (
     ];
 
     for (const c of calls) {
-      if (c.name !== "record_step") continue;
+      if (c.name === "record_step") {
+        const args = safeJsonParse<{ tool_id?: string; reset?: boolean }>(c.args) || {};
+        const toolId = args.tool_id || "";
+        const reset = !!args.reset;
 
-      const args = safeJsonParse<{ tool_id?: string; reset?: boolean }>(c.args) || {};
-      const toolId = args.tool_id || "";
-      const reset = !!args.reset;
+        const toolResult = await onToolCall(toolId, reset);
 
-      const toolResult = await onToolCall(toolId, reset);
+        followMessages.push({
+          role: "tool",
+          tool_call_id: c.id,
+          content: JSON.stringify({ result: toolResult }),
+        });
+      }
 
-      followMessages.push({
-        role: "tool",
-        tool_call_id: c.id,
-        content: JSON.stringify({ result: toolResult }),
-      });
+      if (c.name === "record_graph") {
+        const args =
+          safeJsonParse<{
+            reset?: boolean;
+            nodes?: { id?: string; tool_id: string }[];
+            edges?: { source: string; target: string }[];
+          }>(c.args) || {};
+
+        const nodes = Array.isArray(args.nodes) ? args.nodes : [];
+        const edges = Array.isArray(args.edges) ? args.edges : undefined;
+        const toolResult = await onGraphCall({ reset: !!args.reset, nodes, edges });
+
+        followMessages.push({
+          role: "tool",
+          tool_call_id: c.id,
+          content: JSON.stringify({ result: toolResult }),
+        });
+      }
     }
 
     const second = await postChatCompletions(ctx, {
@@ -464,6 +539,11 @@ export const sendMessageToGemini = async (
   history: { role: string; parts: { text: string }[] }[],
   message: string,
   onToolCall: (toolId: string, reset: boolean) => Promise<{ ok: boolean; message: string }>,
+  onGraphCall: (graph: {
+    reset?: boolean;
+    nodes: { id?: string; tool_id: string }[];
+    edges?: { source: string; target: string }[];
+  }) => Promise<{ ok: boolean; message: string }>,
   providerId?: string
 ): Promise<string> => {
   const ctx = getOpenAIProtocolClient(providerId);
@@ -479,7 +559,7 @@ export const sendMessageToGemini = async (
     model: ctx.model,
     message,
     historyLength: history.length,
-    tools: ["record_step"],
+    tools: ["record_step", "record_graph"],
   });
 
   const messages: OpenAIMessage[] = [
@@ -517,21 +597,41 @@ export const sendMessageToGemini = async (
 
       for (const call of toolCalls) {
         if (call.type !== "function") continue;
-        if (call.function.name !== "record_step") continue;
 
-        const args =
-          safeJsonParse<{ tool_id?: string; reset?: boolean }>(call.function.arguments) || {};
+        if (call.function.name === "record_step") {
+          const args =
+            safeJsonParse<{ tool_id?: string; reset?: boolean }>(call.function.arguments) || {};
 
-        const toolId = args.tool_id || "";
-        const reset = !!args.reset;
+          const toolId = args.tool_id || "";
+          const reset = !!args.reset;
 
-        const toolResult = await onToolCall(toolId, reset);
+          const toolResult = await onToolCall(toolId, reset);
 
-        followMessages.push({
-          role: "tool",
-          tool_call_id: call.id,
-          content: JSON.stringify({ result: toolResult }),
-        });
+          followMessages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: JSON.stringify({ result: toolResult }),
+          });
+        }
+
+        if (call.function.name === "record_graph") {
+          const args =
+            safeJsonParse<{
+              reset?: boolean;
+              nodes?: { id?: string; tool_id: string }[];
+              edges?: { source: string; target: string }[];
+            }>(call.function.arguments) || {};
+
+          const nodes = Array.isArray(args.nodes) ? args.nodes : [];
+          const edges = Array.isArray(args.edges) ? args.edges : undefined;
+          const toolResult = await onGraphCall({ reset: !!args.reset, nodes, edges });
+
+          followMessages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: JSON.stringify({ result: toolResult }),
+          });
+        }
       }
 
       const second = await postChatCompletions(ctx, {

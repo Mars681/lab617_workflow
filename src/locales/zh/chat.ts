@@ -6,7 +6,7 @@ export const chat = {
 
   "chat.title": "AI 助手",
   "chat.placeholder": "输入消息...",
-  "chat.welcome": "你好！我是你的工作流助手。告诉我你要添加什么，例如：“添加矩阵加法，然后归一化数据”。",
+  "chat.welcome": "你好！我是你的工作流助手。告诉我你要添加什么，例如：“用 data.normalize 然后 matrix.add 再 utils.log，自动连线”。“画一个三步流程：先清洗、再归一化、再训练，连成一条线”。“建一个 A->B、A->C 的分支流程：A=matrix.add，B=data.normalize，C=utils.log”。",
   "chat.error": "出错了。",
   "chat.success": "已成功添加 {{toolId}}",
 

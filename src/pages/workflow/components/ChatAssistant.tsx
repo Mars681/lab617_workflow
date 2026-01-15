@@ -2,15 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, Bot, User, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { streamWorkflowChat } from '../../../api/gemini';
-import { ChatMessage } from '../../../types';
+import { ChatMessage, WorkflowGraphRequest } from '../../../types';
 import MessageContent from '../../chat/components/MessageContent';
 
 interface ChatAssistantProps {
   onAddTool: (toolId: string, reset: boolean) => void;
+  onApplyGraph: (graph: WorkflowGraphRequest) => void;
   providerId: string;
 }
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ onAddTool, providerId }) => {
+const ChatAssistant: React.FC<ChatAssistantProps> = ({ onAddTool, onApplyGraph, providerId }) => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -102,6 +103,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onAddTool, providerId }) 
               onAddTool(toolId, reset);
               return { ok: true, message: t('chat.success', { toolId }) };
             }, 
+        async (graph) => {
+          onApplyGraph(graph);
+          return { ok: true, message: t('chat.success', { toolId: 'graph' }) };
+        },
 
         providerId
       );
